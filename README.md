@@ -11,15 +11,15 @@ Automatically sends a PM to members online when a new, unregistered user joins.
 
 Prepends a prefix to some group members.  
 **Options:**  
-`mod_suffixes.rules = {}`: List of rules to apply, first rules take priority
-`mod_suffixes.rules.group_name = "<name>"`: Name of the group to match  
-`mod_suffixes.rules.prefix = "<prefix>"`: Prefix to add for these group members.
+`mod_suffixes.rules = {}`: List of rules to apply, first rules take priority  
+`mod_suffixes.rules.group_name = "<name>"`: Name of the group to match   
+`mod_suffixes.rules.prefix = "<prefix>"`: Prefix to add for these group members.  
 
 ### dnd_spells
 
 Searches a matching DnD spell when called.  
-**Usage: ** `!spell spell name`  
-**Options: **  
+**Usage:** `!spell spell name`  
+**Options:**  
 `dnd_spells.channels = []`: List of channels to trigger this bot in.
 
 ### block_img
