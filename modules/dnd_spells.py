@@ -70,7 +70,50 @@ class dnd_spells(MumoModule):
     #
     #--- Server callback functions
     #
+
+    def get_spell_info(self, search, spell):
+        msg = """
+Here's what I found that's my closest match for {looking_for}:<br><b>
+{spell_name}</b>
+{spell_desc}
+Higher Level: {spell_higher_level}<br>
+Range: {spell_range}
+<br>
+<b>FLO YOU GODDAMN PRICK LIMIT THAT TO DND CHANNEL</b>
+""".format(looking_for = search.encode("utf-8"),
+            spell_name = spell["name"].encode("utf-8"),
+            spell_desc = spell["desc"].encode("utf-8"),
+            spell_higher_level = spell["higher_level"].encode("utf-8") if "higher_level" in spell.keys() else "",
+            spell_range = spell["range"].encode("utf-8") if "range" in spell.keys() else "")
+
+        return msg
     
+    def fuzzy_match(self, name):
+        matching_spell = None
+        # Check for an exact match first
+        if name in self.spells_names:
+            matching_spell = next(spell for spell in self.spells if spell["name"] == name, None)
+        if matching_spell is not None:
+            return self.get_spell_info(name, matching_spell);
+        
+        # No direct match, let's attempt a fuzzy match
+        matches = process.extract(name, self.spells_names, limit=3)
+        if matches is None or len(matches) == 0:
+            return "Well I couldn't even find a single spell in my database. That's bad."
+
+        # Unsure matches go here
+        if matches[0][1] < 50:
+            msg = "I've found some stuff, but I'm not entirely sure that's what you mean. Mind giving me a bit more info? Those are the spells I found that might match:<br>"
+            for item in matches:
+                msg = "<b>"msg + item[0] + "</b><br>"
+            return msg
+
+        matching_spell = next(spell for spell in self.spells if spell["name"] == matches[0][0], None)
+        if matching_spell is None:		
+            return "Well I couldn't even find a single spell in my database. That's bad."
+        
+        return self.get_spell_info(name, matching_spell)
+
     def userTextMessage(self, server, user, message, current=None):
         # Ensure we're using the keyword
         if not message.text.startswith("!spell"):
@@ -80,37 +123,9 @@ class dnd_spells(MumoModule):
         split = message.text.split(" ", 1)
         if len(split) != 2:
             return
-
-        # Attempt to find matching spells in there
-        matching = process.extractOne(split[1].lower(), self.spells_names)
-	#self.log().debug("Comparing against: " + str(self.spells_names))
-
-        # Find a matching spell in the data
-        matching_spell = None
-	#self.log().debug("Found by fuzzy search: " + matching[0])
-        for item in self.spells:
-	    #self.log().debug("Comparing against: " + item["name"])
-            if item["name"].lower() == matching[0]:
-                matching_spell = item
-        if matching_spell is None:		
-	    #self.log().debug("Didn't find any fuck")
-            return
+        name = split[1].lower()
         
-        msg = """
-Here's what I found that's my closest match for {looking_for}:<br><b>
-{spell_name}</b><br>
-{spell_desc}<br>
-Higher Level: {spell_higher_level}<br>
-Range: {spell_range}
-<br>
-<b>FLO YOU GODDAMN PRICK LIMIT THAT TO DND CHANNEL</b>
-""".format(
-	looking_for = split[1].encode("utf-8"),
-	spell_name = matching_spell["name"].encode("utf-8"),
-	spell_desc = matching_spell["desc"].encode("utf-8"),
-	spell_higher_level = matching_spell["higher_level"].encode("utf-8") if "higher_level" in matching_spell.keys() else "",
-	spell_range = matching_spell["range"].encode("utf-8") if "range" in matching_spell.keys() else "")
-	#self.log().debug(msg)        
+        msg = self.fuzzy_match(name)
         server.sendMessageChannel(user.channel, False, msg)
 
     
