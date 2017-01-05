@@ -6,6 +6,8 @@
 #
 
 import json
+import codecs
+import collections
 from mumo_module import MumoModule
 from fuzzywuzzy import process
 
@@ -14,33 +16,33 @@ class dnd_spells(MumoModule):
         MumoModule.__init__(self, name, manager, configuration)
         self.murmur = manager.getMurmurModule()
         # Load spells
-        with open("spells.json") as spells_file:
-            self.spells = json.loads(spells_file.read())
+        with open("resources/dnd_spells/spells.json") as spells_file:
+            self.spells = json.loads(spells_file.read().decode("utf-8"))
         self.spells_names = [item["name"].lower() for item in self.spells]
 
         # Load attribute name -> full length words mapping
-        self.attr_map = {
-            "name": "",
+        self.attr_map = collections.OrderedDict([
+            ("name", u"<b>"),
+            ("level", u"</b><b> • Level</b>: "),
 
-            "page": "Source: ",
-            "range": "Range: ",
-            "components": "Components: ",
-            "material": "Material: ",
-            "ritual": "Is a Ritual",
-            "concentration": "Is a Concentration spell",
-            "casting_time": "Time to cast: ",
-            "level": "Level: ",
-            "class": "Usable by ",
-            "school": "School of ",
-            "circle": "Circle of the ",
-            "archetype": "Archetype: ",
-            "duration": "Duration: ",
-            "domains": "Domains: ",
-            "patrons": "Patrons: ",
-            "oaths": "Oaths: ",
+            ("page", u"<b> • Source</b>: "),
+            ("range", u"<b> • Range</b>: "),
+            ("components", u"<b> • Components</b>: "),
+            ("material", u"<b> • Material</b>: "),
+            ("ritual", u"<b> • Is a Ritual</b>"),
+            ("concentration", u"<b> • Is a Concentration spell</b>"),
+            ("casting_time", u"<b> • Time to cast: </b>"),
+            ("class", u"<b> • Usable by</b>: "),
+            ("school", u"<b> • School</b>: "),
+            ("circle", u"<b> • Circle</b>: "),
+            ("archetype", u"<b> • Archetype</b>: "),
+            ("duration", u"<b> • Duration</b>: "),
+            ("domains", u"<b> • Domains</b>: "),
+            ("patrons", u"<b> • Patrons</b>: "),
+            ("oaths", u"<b> • Oaths</b>: "),
 
-            "desc": ""
-        }
+            ("desc", u"<br><br>")
+        ])
 
     def connected(self):
         manager = self.manager()
@@ -67,7 +69,7 @@ class dnd_spells(MumoModule):
         msg = """Here's what I found that's my closest match for {looking_for}:<br>""".format(looking_for=search.encode("utf-8"))
         for k in self.attr_map:
             if k in spell_keys:
-                msg = msg + self.attr_map[k] + spell[k] + "<br>"
+                msg = msg + self.attr_map[k].encode("utf-8") + spell[k].encode("utf-8") + "<br>"
 
         return msg
 
