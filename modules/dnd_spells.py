@@ -16,24 +16,29 @@ class dnd_spells(MumoModule):
         MumoModule.__init__(self, name, manager, configuration)
         self.murmur = manager.getMurmurModule()
         # Load spells
+        self.spells = dict()
+        self.spells_names = dict()
         with open("resources/dnd_spells/spells.json") as spells_file:
-            self.spells = json.loads(spells_file.read().decode("utf-8"))
-        self.spells_names = [item["name"].lower() for item in self.spells]
+            self.spells["dnd"] = json.loads(spells_file.read().decode("utf-8"))
+            self.spells_names["dnd"] = [item["name"].lower() for item in self.spells["dnd"]]
+        with open("resources/dnd_spells/pf_spells.json") as spells_files:
+            self.spells["pathfinder"] = json.loads(spells_file.read().decode("utf-8"))
+            self.spells_names["pathfinder"] = [item["name"].lower() for item in self.spells["pathfinder"]]
 
         # Load attribute name -> full length words mapping
-        self.attr_map = collections.OrderedDict([
+        self.attr_map = {"dnd": collections.OrderedDict([
             ("name", u"<b>"),
             ("level", u"</b><b> • Level</b>: "),
+            ("school", u"<b> • School</b>: "),
 
             ("page", u"<b> • Source</b>: "),
             ("range", u"<b> • Range</b>: "),
             ("components", u"<b> • Components</b>: "),
             ("material", u"<b> • Material</b>: "),
-            ("ritual", u"<b> • Is a Ritual</b>"),
-            ("concentration", u"<b> • Is a Concentration spell</b>"),
+            ("ritual", u"<b> • Is a Ritual: </b>"),
+            ("concentration", u"<b> • Is a Concentration spell: </b>"),
             ("casting_time", u"<b> • Time to cast: </b>"),
             ("class", u"<b> • Usable by</b>: "),
-            ("school", u"<b> • School</b>: "),
             ("circle", u"<b> • Circle</b>: "),
             ("archetype", u"<b> • Archetype</b>: "),
             ("duration", u"<b> • Duration</b>: "),
@@ -42,7 +47,26 @@ class dnd_spells(MumoModule):
             ("oaths", u"<b> • Oaths</b>: "),
 
             ("desc", u"<br><br>")
-        ])
+        ]),
+        "pathfinder": collections.OrderedDict([
+            ("name", "<b>"),
+            ("level", u"</b><b> • Level</b>: "),
+            ("school", u"<b> • School</b>: "),
+            ("subschool", u"<b> • Subschool</b>: "),
+            ("effect", u"<b> • Effect: </b>"),
+
+            ("range", u"<b> • Range</b>: "),
+            ("area", u"<b> • Area: </b>"),
+            ("duration", u"<b> • Duration: </b>"),
+            ("target", u"<b> • Target: </b>"),
+            
+            ("components", u"<b> • Components</b>: "),
+            ("casting_time", u"<b> • Time to cast: </b>"),
+            ("saving_throw", u"<b> • Saving Throw: </b>"),
+            ("spell_resistance", u"<b> • Spell Resistance: </b>"),
+
+            ("description", u"<br><br>")
+        ])}
 
     def connected(self):
         manager = self.manager()
@@ -64,25 +88,38 @@ class dnd_spells(MumoModule):
     #--- Server callback functions
     #
 
-    def get_spell_info(self, search, spell):
+    def get_spell_info(self, search, spell, key):
         spell_keys = spell.keys()
         msg = """Here's what I found that's my closest match for {looking_for}:<br>""".format(looking_for=search.encode("utf-8"))
-        for k in self.attr_map:
+        for k in self.attr_map[key]:
             if k in spell_keys:
-                msg = msg + self.attr_map[k].encode("utf-8") + spell[k].encode("utf-8") + "<br>"
+                msg = msg + self.attr_map[key][k].encode("utf-8") + spell[k].encode("utf-8") + "<br>"
 
         return msg
 
-    def fuzzy_match(self, name):
+    # Returns the appropriate key at which to look for spells, relative to the user's channel
+    # Todo: make that less of an awful hack
+    def get_spell_list(self, user, server):
+        chan = user.channel
+        all_chans = server.getChannels()
+        if chan in all_chans:
+            if all_chans[chan] == "Dungeons and Dragons":
+                return "dnd"
+            elif all_chans[chan] == "Pathfinder":
+                return "pathfinder"
+            else:
+                return None
+
+    def fuzzy_match(self, name, key):
         matching_spell = None
         # Check for an exact match first
-        if name in self.spells_names:
-            matching_spell = next((spell for spell in self.spells if spell["name"].lower() == name), None)
+        if name in self.spells_names[key]:
+            matching_spell = next((spell for spell in self.spells[key] if spell["name"].lower() == name), None)
         if matching_spell is not None:
-            return self.get_spell_info(name, matching_spell)
+            return self.get_spell_info(name, matching_spell, key)
 
         # No direct match, let's attempt a fuzzy match
-        matches = process.extract(name, self.spells_names, limit=3)
+        matches = process.extract(name, self.spells_names[key], limit=3)
         if matches is None or len(matches) == 0:
             return "Well I couldn't even find a single spell in my database that matches that. That's bad."
 
@@ -93,12 +130,13 @@ class dnd_spells(MumoModule):
                 msg = msg + "<b>" + item[0].encode("utf-8").title() + "</b><br>"
             return msg
 
-        matching_spell = next((spell for spell in self.spells if spell["name"].lower() == matches[0][0]), None)
+        matching_spell = next((spell for spell in self.spells[key] if spell["name"].lower() == matches[0][0]), None)
         if matching_spell is None:
             return "Well I couldn't even find a single spell in my database. That's bad. For the record, I tried to match against " + matches[0][0]
 
-        msg = self.get_spell_info(name, matching_spell)
+        msg = self.get_spell_info(name, matching_spell, key)
         msg = msg + "<br>In case that's wrong, here are some other close matches I have in database:<br>"
+        # Skip the first match, we already returned it
         iterspell = iter(matches)
         next(iterspell)
         for item in iterspell:
@@ -110,6 +148,9 @@ class dnd_spells(MumoModule):
         # Ensure we're using the keyword
         if not message.text.startswith("!spell"):
             return
+        key = self.get_spell_list(user, server)
+        if key is None:
+            server.sendMessage(user.session, "This bot only works in the D&D/Pathfinder channels")
 
         # Get the searched spell name
         split = message.text.split(" ", 1)
@@ -117,7 +158,7 @@ class dnd_spells(MumoModule):
             return
         name = split[1].lower()
 
-        msg = self.fuzzy_match(name)
+        msg = self.fuzzy_match(name, key)
         server.sendMessageChannel(user.channel, False, msg)
 
 
